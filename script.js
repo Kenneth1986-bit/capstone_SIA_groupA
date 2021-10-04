@@ -1,47 +1,124 @@
-var random_margin = ["-5px", "1px", "5px", "10px", "7px"];
-var random_colors = ["#c2ff3d","#ff3de8","#3dc2ff","#04e022","#bc83e6","#ebb328"];
-var random_degree = ["rotate(3deg)", "rotate(1deg)", "rotate(-1deg)", "rotate(-3deg)", "rotate(-5deg)", "rotate(-8deg)"];
-var index = 0;
+var zIndex = 1;
 
-window.onload = document.querySelector("#user_input").select();
+(function(window, document) {
+  window.addEventListener('load', loaded, false);
 
-document.querySelector("#add_note").addEventListener("click", () => {
-  document.querySelector("#modal").style.display = "block";
-});
-
-document.querySelector("#hide").addEventListener("click", () => {
-  document.querySelector("#modal").style.display = "none";
-});
-
-document.querySelector("#user_input").addEventListener('keydown', (event) => {
-  if(event.key === 'Enter'){
-    const text = document.querySelector("#user_input");
-    createStickyNote(text.value);
+  function loaded() {
+    window.removeEventListener('load', loaded, false);
+    main();
   }
-});
 
-createStickyNote = (text) => {
-  let note = document.createElement("div");
-  let details = document.createElement("div");
-  let noteText = document.createElement("h1");
+  function main() {
+    var closeButtons = document.querySelectorAll('.close');
+    var minimizeButtons = document.querySelectorAll('.minimize');
+    var createButton = document.querySelector('.add');
 
-  note.className = "note";
-  details.className = "details";
-  noteText.textContent = text;
+    createButton.addEventListener('click', create, false);
 
-  details.appendChild(noteText);
-  note.appendChild(details);
+    for (var i = 0; i < minimizeButtons.length; i++) {
+      minimizeButtons[i].addEventListener('click', minimize, false);
+    }
 
-  if(index > random_colors.length - 1)
-    index = 0;
+    for (i = 0; i < closeButtons.length; i++) {
+      closeButtons[i].addEventListener('click', close, false);
+    }
 
-  note.setAttribute("style", `margin:${random_margin[Math.floor(Math.random() * random_margin.length)]}; background-color:${random_colors[index++]}; transform:${random_degree[Math.floor(Math.random() * random_degree.length)]}`);
+    document.body.addEventListener('dragover', drag_over, false);
+    document.body.addEventListener('drop', drop, false);
+  }
 
-  note.addEventListener("dblclick", () => {
-    note.remove();
-  })
+  function drag_start(event) {
+    var style = window.getComputedStyle(event.target, null);
+    event.dataTransfer.setData("text/plain",
+      (parseInt(style.getPropertyValue("left"), 10) - event.clientX) + ',' + (parseInt(style.getPropertyValue("top"), 10) - event.clientY));
+    event.dataTransfer.setData("target", event.target.id);
+  }
 
-  document.querySelector("#all_notes").appendChild(note);
-}
+  function drag_over(event) {
+    event.preventDefault();
+    return false;
+  }
 
+  function drop(event) {
+    var offset = event.dataTransfer.getData("text/plain").split(',');
+    var j = document.getElementById(event.dataTransfer.getData("target"));
+    j.style.left = (event.clientX + parseInt(offset[0], 10)) + 'px';
+    j.style.top = (event.clientY + parseInt(offset[1], 10)) + 'px';
+    event.preventDefault();
+    return false;
+  }
 
+  function close(event) {
+    event.stopPropagation();
+    var note = this.parentNode.parentNode;
+    note.classList.toggle('closed');
+    var wrapper = document.querySelector('.wrapper');
+    setTimeout(function() {
+      wrapper.removeChild(note);
+      note = null;
+    }, 1000);
+  }
+
+  function minimize(event) {
+    event.stopPropagation();
+    var text = this.parentNode.parentNode.querySelector('.text');
+    text.classList.toggle('minimized');
+  }
+
+  function move(event) {
+    event.preventDefault();
+    console.log(event.target);
+    event.target.style.left = event.clientX;
+    event.target.style.top = event.clientY;
+    console.log('dragged', event.clientX, event.clientY);
+  }
+
+  function create(event) {
+    event.preventDefault();
+    var parent = document.querySelector('.add-note');
+    var textarea = parent.querySelector('textarea');
+    var addButton = parent.querySelector('button');
+
+    parent.classList.toggle('hidden');
+
+    addButton.addEventListener('click', addnote, false);
+
+    function addnote() {
+      Handlebars.registerHelper('breakLine', function(text) {
+        return text.replace(/\n/, '<br/>');
+      });
+
+      var source = document.getElementById('entry-template').innerHTML;
+      var template = Handlebars.compile(source);
+      var text = document.querySelector('textarea').value;
+      var title = document.querySelector('input').value;
+      var context = {
+        text: text,
+        title: title,
+      };
+
+      var note = document.createElement('div');
+      note.classList.add('note');
+      note.setAttribute('draggable', 'true');
+      note.setAttribute('id', zIndex);
+      note.innerHTML = template(context);
+      note.style['z-index'] = zIndex;
+
+      zIndex += 1;
+
+      var wrapper = document.querySelector('.wrapper');
+      var newNote = wrapper.appendChild(note);
+      var closeButton = newNote.querySelector('.close');
+      var minimizeButton = newNote.querySelector('.minimize');
+      var mainBar = newNote.querySelector('.mainbar');
+
+      newNote.addEventListener('dragstart', drag_start, false);
+      parent.classList.toggle('hidden');
+      document.querySelector('textarea').value = '';
+      document.querySelector('input').value = '';
+      minimizeButton.addEventListener('click', minimize, false);
+      closeButton.addEventListener('click', close, false);
+      addButton.removeEventListener('click', addnote, false);
+    }
+  }
+})(window, document);
